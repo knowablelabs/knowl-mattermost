@@ -1,0 +1,26 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Knowable Labs <knowl@knowl.invalid>
+Date: Wed, 21 Oct 2026 20:12:58 -0700
+Subject: [PATCH 5/8] webapp: leave Town Square out of the sidebar
+
+It is Mattermost's default channel, not one of Knowl's Topics, and it
+cannot be left or archived. It still shows while it is open.
+---
+ .../src/selectors/entities/channel_categories.ts              | 4 +++-
+ 1 file changed, 3 insertions(+), 1 deletion(-)
+
+diff --git a/webapp/channels/src/packages/mattermost-redux/src/selectors/entities/channel_categories.ts b/webapp/channels/src/packages/mattermost-redux/src/selectors/entities/channel_categories.ts
+index fd56d28a..7ee6dffb 100644
+--- a/webapp/channels/src/packages/mattermost-redux/src/selectors/entities/channel_categories.ts
++++ b/webapp/channels/src/packages/mattermost-redux/src/selectors/entities/channel_categories.ts
+@@ -86,7 +86,9 @@ export function makeFilterArchivedChannels(): (state: GlobalState, channels: Cha
+         (state: GlobalState, channels: Channel[]) => channels,
+         getCurrentChannelId,
+         (channels: Channel[], currentChannelId: string) => {
+-            const filtered = channels.filter((channel) => channel && (channel.id === currentChannelId || channel.delete_at === 0));
++            // Knowl: Town Square is Mattermost's default channel, not a Topic, and it cannot be
++            // left; the sidebar leaves it out unless it is open.
++            const filtered = channels.filter((channel) => channel && (channel.id === currentChannelId || (channel.delete_at === 0 && channel.name !== 'town-square')));
+ 
+             return filtered.length === channels.length ? channels : filtered;
+         },

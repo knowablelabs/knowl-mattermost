@@ -1,0 +1,131 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Knowable Labs <knowl@knowl.invalid>
+Date: Wed, 21 Oct 2026 18:56:51 -0700
+Subject: [PATCH 3/8] webapp: Knowl's theme, and the default
+
+The dashboard's dark paper in the sidebar, paper and ink in the centre,
+lime for mentions and the active marker.
+---
+ .../theme_provider/theme_provider.tsx         |  2 +-
+ .../src/constants/preferences.ts              | 31 +++++++++++++++++++
+ .../src/selectors/entities/preferences.ts     |  6 ++--
+ .../mattermost-redux/src/utils/theme_utils.ts |  3 +-
+ webapp/channels/src/utils/utils.tsx           |  2 +-
+ 5 files changed, 38 insertions(+), 6 deletions(-)
+
+diff --git a/webapp/channels/src/components/theme_provider/theme_provider.tsx b/webapp/channels/src/components/theme_provider/theme_provider.tsx
+index 981be4d0..0303e33d 100644
+--- a/webapp/channels/src/components/theme_provider/theme_provider.tsx
++++ b/webapp/channels/src/components/theme_provider/theme_provider.tsx
+@@ -24,7 +24,7 @@ export default function ThemeProvider({children}: {children: React.ReactNode}) {
+             return getTheme(state);
+         }
+ 
+-        return Preferences.THEMES.denim;
++        return Preferences.THEMES.knowl;
+     });
+ 
+     useEffect(() => {
+diff --git a/webapp/channels/src/packages/mattermost-redux/src/constants/preferences.ts b/webapp/channels/src/packages/mattermost-redux/src/constants/preferences.ts
+index e3c98831..467eb6a8 100644
+--- a/webapp/channels/src/packages/mattermost-redux/src/constants/preferences.ts
++++ b/webapp/channels/src/packages/mattermost-redux/src/constants/preferences.ts
+@@ -92,6 +92,37 @@ const Preferences = {
+ 
+     CATEGORY_THEME: 'theme',
+     THEMES: {
++        // Knowl: Knowable Labs' theme and the default (docs/guides/agent-workspace-design.md
++        // in knowablelabs, Brand): the dashboard's dark paper beside, paper and ink in the
++        // centre, lime for Knowl.
++        knowl: {
++            type: 'Knowl',
++            sidebarBg: '#161618',
++            sidebarText: '#ecebe6',
++            sidebarUnreadText: '#ffffff',
++            sidebarTextHoverBg: '#27272c',
++            sidebarTextActiveBorder: '#c6da3a',
++            sidebarTextActiveColor: '#ffffff',
++            sidebarHeaderBg: '#111113',
++            sidebarHeaderTextColor: '#ecebe6',
++            sidebarTeamBarBg: '#0c0c0e',
++            onlineIndicator: '#7fcf9c',
++            awayIndicator: '#e6b85a',
++            dndIndicator: '#f08a82',
++            mentionBg: '#c6da3a',
++            mentionBj: '#c6da3a',
++            mentionColor: '#1c1b19',
++            centerChannelBg: '#fbfaf7',
++            centerChannelColor: '#1c1b19',
++            newMessageSeparator: '#2f7f86',
++            linkColor: '#2f7f86',
++            buttonBg: '#1c1b19',
++            buttonColor: '#fbfaf7',
++            errorTextColor: '#b3261e',
++            mentionHighlightBg: '#eef2c4',
++            mentionHighlightLink: '#1c1b19',
++            codeTheme: 'github',
++        },
+         denim: {
+             type: 'Denim',
+             sidebarBg: '#1e325c',
+diff --git a/webapp/channels/src/packages/mattermost-redux/src/selectors/entities/preferences.ts b/webapp/channels/src/packages/mattermost-redux/src/selectors/entities/preferences.ts
+index af47b629..0d060f88 100644
+--- a/webapp/channels/src/packages/mattermost-redux/src/selectors/entities/preferences.ts
++++ b/webapp/channels/src/packages/mattermost-redux/src/selectors/entities/preferences.ts
+@@ -133,11 +133,11 @@ const getThemePreference = createSelector(
+     },
+ );
+ 
+-export type ThemeKey = 'denim' | 'sapphire' | 'quartz' | 'indigo' | 'onyx';
++export type ThemeKey = 'knowl' | 'denim' | 'sapphire' | 'quartz' | 'indigo' | 'onyx';
+ 
+ export type LegacyThemeType = 'Mattermost' | 'Organization' | 'Mattermost Dark' | 'Windows Dark';
+ 
+-export type ThemeType = 'Denim' | 'Sapphire' | 'Quartz' | 'Indigo' | 'Onyx';
++export type ThemeType = 'Knowl' | 'Denim' | 'Sapphire' | 'Quartz' | 'Indigo' | 'Onyx';
+ 
+ export type Theme = {
+     [key: string]: string | undefined;
+@@ -178,7 +178,7 @@ const getDefaultTheme = createSelector('getDefaultTheme', getConfig, (config): T
+     }
+ 
+     // If no config.DefaultTheme or value doesn't refer to a valid theme name...
+-    return Preferences.THEMES.denim;
++    return Preferences.THEMES.knowl;
+ });
+ 
+ export const getTheme: (state: GlobalState) => Theme = createShallowSelector(
+diff --git a/webapp/channels/src/packages/mattermost-redux/src/utils/theme_utils.ts b/webapp/channels/src/packages/mattermost-redux/src/utils/theme_utils.ts
+index f42fb9cd..7decfe30 100644
+--- a/webapp/channels/src/packages/mattermost-redux/src/utils/theme_utils.ts
++++ b/webapp/channels/src/packages/mattermost-redux/src/utils/theme_utils.ts
+@@ -125,6 +125,7 @@ const themeTypeMap: ThemeTypeMap = {
+     Organization: 'sapphire',
+     'Mattermost Dark': 'indigo',
+     'Windows Dark': 'onyx',
++    Knowl: 'knowl',
+     Denim: 'denim',
+     Sapphire: 'sapphire',
+     Quartz: 'quartz',
+@@ -134,7 +135,7 @@ const themeTypeMap: ThemeTypeMap = {
+ 
+ // setThemeDefaults will set defaults on the theme for any unset properties.
+ export function setThemeDefaults(theme: Partial<Theme>): Theme {
+-    const defaultTheme = Preferences.THEMES.denim;
++    const defaultTheme = Preferences.THEMES.knowl;
+ 
+     const processedTheme = {...theme};
+ 
+diff --git a/webapp/channels/src/utils/utils.tsx b/webapp/channels/src/utils/utils.tsx
+index cc781ce8..02b0e1fe 100644
+--- a/webapp/channels/src/utils/utils.tsx
++++ b/webapp/channels/src/utils/utils.tsx
+@@ -557,7 +557,7 @@ export function applyTheme(theme: Theme) {
+ }
+ 
+ export function resetTheme() {
+-    applyTheme(Preferences.THEMES.denim);
++    applyTheme(Preferences.THEMES.knowl);
+ }
+ 
+ function changeCss(className: string, classValue: string) {

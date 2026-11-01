@@ -1,0 +1,27 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Knowable Labs <knowl@knowl.invalid>
+Date: Wed, 21 Oct 2026 18:56:00 -0700
+Subject: [PATCH 1/8] mmctl: build compliance export only with the
+ source-available tags
+
+Knowl builds the open-source edition: nothing under server/enterprise
+(Mattermost Source Available License) may be linked.
+---
+ server/cmd/mmctl/commands/compliance_export.go | 4 ++++
+ 1 file changed, 4 insertions(+)
+
+diff --git a/server/cmd/mmctl/commands/compliance_export.go b/server/cmd/mmctl/commands/compliance_export.go
+index 614dfef8..7dec8837 100644
+--- a/server/cmd/mmctl/commands/compliance_export.go
++++ b/server/cmd/mmctl/commands/compliance_export.go
+@@ -1,6 +1,10 @@
+ // Copyright (c) 2015-present Mattermost, Inc. All Rights Reserved.
+ // See LICENSE.txt for license information.
+ 
++// Knowl: compliance export imports source-available code (server/enterprise), so it is
++// built only with the enterprise or sourceavailable tags.
++//go:build enterprise || sourceavailable
++
+ package commands
+ 
+ import (

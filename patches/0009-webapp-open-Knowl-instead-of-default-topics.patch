@@ -1,0 +1,71 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Knowable Labs <knowl@knowl.invalid>
+Date: Tue, 27 Oct 2026 13:40:00 -0700
+Subject: [PATCH 9/9] webapp: enter Knowl instead of the default Town Square topic
+
+Keep the required internal channel out of research navigation and send the
+pilot-only initial route to the assistant DM; the full plugin retains its
+research-topic landing screen. See
+ docs/guides/organization-hosting-pilot.md, Default workspace navigation.
+---
+diff --git a/webapp/channels/src/components/channel_layout/center_channel/center_channel.tsx b/webapp/channels/src/components/channel_layout/center_channel/center_channel.tsx
+index cb95321e..49350a26 100644
+--- a/webapp/channels/src/components/channel_layout/center_channel/center_channel.tsx
++++ b/webapp/channels/src/components/channel_layout/center_channel/center_channel.tsx
+@@ -71,7 +71,7 @@ export default class CenterChannel extends React.PureComponent<Props, State> {
+     }
+
+     render() {
+-        const {lastChannelPath, isCollapsedThreadsEnabled, isMobileView} = this.props;
++        const {lastChannelPath, isCollapsedThreadsEnabled, isMobileView, pluginsEnabled} = this.props;
+         const url = this.props.match.url;
+
+         return (
+@@ -86,6 +86,10 @@ export default class CenterChannel extends React.PureComponent<Props, State> {
+                 {isMobileView && <MobileChannelHeader/>}
+                 <div className='row main'>
+                     <Switch>
++                        {/* The full Knowable Labs plugin owns the research landing screen. */}
++                        {!pluginsEnabled && <Route exact={true} path={`${url}/channels/town-square`}>
++                            <Redirect to={`${url}/messages/@knowl`}/>
++                        </Route>}
+                         <Route
+                             path={`${url}/pl/:postid(${ID_PATH_PATTERN})`}
+                             render={(props) => (
+diff --git a/webapp/channels/src/components/channel_layout/center_channel/index.ts b/webapp/channels/src/components/channel_layout/center_channel/index.ts
+index a0967e8d..77970c63 100644
+--- a/webapp/channels/src/components/channel_layout/center_channel/index.ts
++++ b/webapp/channels/src/components/channel_layout/center_channel/index.ts
+@@ -10,6 +10,7 @@ import type {Dispatch} from 'redux';
+
+ import {getProfiles} from 'mattermost-redux/actions/users';
+ import {getRedirectChannelNameForTeam} from 'mattermost-redux/selectors/entities/channels';
++import {getConfig} from 'mattermost-redux/selectors/entities/general';
+ import {isCollapsedThreadsEnabled} from 'mattermost-redux/selectors/entities/preferences';
+ import {getTeamByName} from 'mattermost-redux/selectors/entities/teams';
+ import {getCurrentUserId} from 'mattermost-redux/selectors/entities/users';
+@@ -56,6 +57,7 @@ const mapStateToProps = (state: GlobalState, ownProps: OwnProps) => {
+     }
+
+     return {
++        pluginsEnabled: getConfig(state).PluginsEnabled === 'true',
+         lastChannelPath,
+         lhsOpen: getIsLhsOpen(state),
+         rhsOpen: getIsRhsOpen(state),
+diff --git a/webapp/channels/src/packages/mattermost-redux/src/selectors/entities/channel_categories.ts b/webapp/channels/src/packages/mattermost-redux/src/selectors/entities/channel_categories.ts
+index 54a6b75e..8cf2fee2 100644
+--- a/webapp/channels/src/packages/mattermost-redux/src/selectors/entities/channel_categories.ts
++++ b/webapp/channels/src/packages/mattermost-redux/src/selectors/entities/channel_categories.ts
+@@ -86,9 +86,9 @@ export function makeFilterArchivedChannels(): (state: GlobalState, channels: Cha
+         (state: GlobalState, channels: Channel[]) => channels,
+         getCurrentChannelId,
+         (channels: Channel[], currentChannelId: string) => {
+-            // Knowl: Town Square is Mattermost's default channel, not a Topic, and it cannot be
+-            // left; the sidebar leaves it out unless it is open.
+-            const filtered = channels.filter((channel) => channel && (channel.id === currentChannelId || (channel.delete_at === 0 && channel.name !== 'town-square')));
++            // Knowable Labs: the required Town Square channel is not a research Topic.
++            // Keep it out of navigation even while restoring an old active channel.
++            const filtered = channels.filter((channel) => channel && channel.name !== 'town-square' && (channel.id === currentChannelId || channel.delete_at === 0));
+
+             return filtered.length === channels.length ? channels : filtered;
+         },

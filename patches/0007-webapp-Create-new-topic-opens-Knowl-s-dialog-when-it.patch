@@ -1,0 +1,40 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Knowable Labs <knowl@knowl.invalid>
+Date: Wed, 21 Oct 2026 21:02:44 -0700
+Subject: [PATCH 7/8] webapp: Create new topic opens Knowl's dialog when its
+ plugin is loaded
+
+Every entry point (the sidebar's menus, Browse topics) goes through
+openModal for the new-channel dialog; with Knowl's plugin loaded it opens
+Knowl's market-topic dialog instead.
+---
+ webapp/channels/src/actions/views/modals.ts | 12 +++++++++++-
+ 1 file changed, 11 insertions(+), 1 deletion(-)
+
+diff --git a/webapp/channels/src/actions/views/modals.ts b/webapp/channels/src/actions/views/modals.ts
+index dd1fc5a4..76dbf9e3 100644
+--- a/webapp/channels/src/actions/views/modals.ts
++++ b/webapp/channels/src/actions/views/modals.ts
+@@ -1,11 +1,21 @@
+ // Copyright (c) 2015-present Mattermost, Inc. All Rights Reserved.
+ // See LICENSE.txt for license information.
+ 
+-import {ActionTypes} from 'utils/constants';
++import {ActionTypes, ModalIdentifiers} from 'utils/constants';
+ 
+ import type {ModalData} from 'types/actions';
+ 
++// Knowl: every "Create new topic" (the sidebar's menus, Browse topics) opens Knowl's own
++// dialog when its plugin has registered one, so a Topic is made as a market Topic with its
++// repository; without the plugin, Mattermost's dialog opens as before.
++type KnowlWindow = {knowlCreateTopic?: () => void};
++
+ export function openModal<P>(modalData: ModalData<P>) {
++    const knowl = window as unknown as KnowlWindow;
++    if (modalData.modalId === ModalIdentifiers.NEW_CHANNEL_MODAL && typeof knowl.knowlCreateTopic === 'function') {
++        knowl.knowlCreateTopic();
++        return {type: 'KNOWL_CREATE_TOPIC_OPENED', modalId: modalData.modalId};
++    }
+     return {
+         type: ActionTypes.MODAL_OPEN,
+         modalId: modalData.modalId,

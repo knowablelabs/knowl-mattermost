@@ -1,0 +1,34 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Knowable Labs <knowl@knowl.invalid>
+Date: Fri, 23 Oct 2026 07:46:49 -0700
+Subject: [PATCH 8/8] webapp: sort a sidebar section's recency by the last
+ message, replies included
+
+Mattermost sorts by the last root post when collapsed reply threads are
+on. In Knowl a Topic's work is mostly replies in its threads, and the
+operator wants Topics and Agents ordered by the most recent message sent
+or received, whichever kind.
+---
+ .../src/selectors/entities/channel_categories.ts          | 8 +++++---
+ 1 file changed, 5 insertions(+), 3 deletions(-)
+
+diff --git a/webapp/channels/src/packages/mattermost-redux/src/selectors/entities/channel_categories.ts b/webapp/channels/src/packages/mattermost-redux/src/selectors/entities/channel_categories.ts
+index 7ee6dffb..54a6b75e 100644
+--- a/webapp/channels/src/packages/mattermost-redux/src/selectors/entities/channel_categories.ts
++++ b/webapp/channels/src/packages/mattermost-redux/src/selectors/entities/channel_categories.ts
+@@ -336,10 +336,12 @@ export function makeSortChannelsByRecency(): (state: GlobalState, channels: Chan
+         'makeSortChannelsByRecency',
+         (_state: GlobalState, channels: Channel[]) => channels,
+         isCollapsedThreadsEnabled,
+-        (channels, crtEnabled) => {
++        (channels, _crtEnabled) => {
++            // Knowl: recency is the last message sent or received, a reply in a thread
++            // included, with or without collapsed reply threads (the operator, 2026-10-23).
+             return [...channels].sort((a, b) => {
+-                const aLastPostAt = Math.max(crtEnabled ? (a.last_root_post_at || a.last_post_at) : a.last_post_at, a.create_at);
+-                const bLastPostAt = Math.max(crtEnabled ? (b.last_root_post_at || b.last_post_at) : b.last_post_at, b.create_at);
++                const aLastPostAt = Math.max(a.last_post_at, a.last_root_post_at, a.create_at);
++                const bLastPostAt = Math.max(b.last_post_at, b.last_root_post_at, b.create_at);
+                 return bLastPostAt - aLastPostAt;
+             });
+         },

@@ -1,0 +1,25 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Knowable Labs <knowl@knowl.invalid>
+Date: Wed, 21 Oct 2026 20:12:58 -0700
+Subject: [PATCH 6/8] server: an agent's first message says how to reach it in
+ chat
+
+Mattermost tells a bot's owner to add it to teams and channels by hand;
+in Knowl's workspace the agents are added when Knowl sends them.
+---
+ server/i18n/en.json | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/server/i18n/en.json b/server/i18n/en.json
+index 57c49aa5..3dcb7c23 100644
+--- a/server/i18n/en.json
++++ b/server/i18n/en.json
+@@ -253,7 +253,7 @@
+   },
+   {
+     "id": "api.bot.teams_channels.add_message_mobile",
+-    "translation": "Please add me to teams and channels you want me to interact in. To do this, use the browser or Mattermost Desktop App."
++    "translation": "I'm one of Knowl's agents. There is nothing to set up: Knowl brings me into a Topic's thread when it sends me. To have me look into something, ask Knowl in a Topic, or tell me here."
+   },
+   {
+     "id": "api.channel.add_guest.added",
