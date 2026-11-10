@@ -1,0 +1,71 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Knowable Labs <knowl@knowl.invalid>
+Date: Mon, 9 Nov 2026 18:04:58 -0800
+Subject: [PATCH 12/12] webapp: no Recent mentions, and no Invite Members under
+ direct messages
+
+Nobody mentions the person in a workspace of agents; questions and approvals
+come as cards. A conversation is with an agent, and agents are not invited.
+
+docs/guides/agent-workspace-design.md, Workspace controls.
+---
+ .../global_header/right_controls/right_controls.tsx   |  9 ++++-----
+ .../sidebar/sidebar_category/sidebar_category.tsx     | 11 ++---------
+ 2 files changed, 6 insertions(+), 14 deletions(-)
+
+diff --git a/webapp/channels/src/components/global_header/right_controls/right_controls.tsx b/webapp/channels/src/components/global_header/right_controls/right_controls.tsx
+index 7c372281..c45c390c 100644
+--- a/webapp/channels/src/components/global_header/right_controls/right_controls.tsx
++++ b/webapp/channels/src/components/global_header/right_controls/right_controls.tsx
+@@ -21,7 +21,6 @@ import {isChannels} from 'utils/products';
+ 
+ import type {GlobalState} from 'types/store';
+ 
+-import AtMentionsButton from './at_mentions_button/at_mentions_button';
+ import PlanUpgradeButton from './plan_upgrade_button';
+ import SavedPostsButton from './saved_posts_button/saved_posts_button';
+ import SettingsButton from './settings_button';
+@@ -63,10 +62,10 @@ const RightControls = ({productId = null}: Props): JSX.Element => {
+         >
+             <PlanUpgradeButton/>
+             {isChannels(productId) ? (
+-                <>
+-                    <AtMentionsButton/>
+-                    <SavedPostsButton/>
+-                </>
++
++                // Knowl: nobody mentions the person; questions and approvals come as cards,
++                // so there is no Recent mentions beside Saved messages.
++                <SavedPostsButton/>
+             ) : (
+                 <Pluggable
+                     pluggableName={'Product'}
+diff --git a/webapp/channels/src/components/sidebar/sidebar_category/sidebar_category.tsx b/webapp/channels/src/components/sidebar/sidebar_category/sidebar_category.tsx
+index 69867da6..97e49d64 100644
+--- a/webapp/channels/src/components/sidebar/sidebar_category/sidebar_category.tsx
++++ b/webapp/channels/src/components/sidebar/sidebar_category/sidebar_category.tsx
+@@ -28,7 +28,6 @@ import SidebarCategoryMenu from './sidebar_category_menu';
+ import SidebarCategorySortingMenu from './sidebar_category_sorting_menu';
+ 
+ import AddChannelsCtaButton from '../add_channels_cta_button';
+-import InviteMembersButton from '../invite_members_button';
+ import {SidebarCategoryHeader} from '../sidebar_category_header';
+ import SidebarChannel from '../sidebar_channel';
+ 
+@@ -369,14 +368,8 @@ export default class SidebarCategory extends React.PureComponent<Props, State> {
+                 disableInteractiveElementBlocking={true}
+             >
+                 {(provided, snapshot) => {
+-                    let inviteMembersButton = null;
+-                    if (category.type === 'direct_messages' && !category.collapsed) {
+-                        inviteMembersButton = (
+-                            <InviteMembersButton
+-                                className='followingSibling'
+-                            />
+-                        );
+-                    }
++                    // Knowl: a conversation is with an agent, and agents are not invited.
++                    const inviteMembersButton = null;
+ 
+                     let addChannelsCtaButton = null;
+                     if (category.type === 'channels' && !category.collapsed) {

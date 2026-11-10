@@ -1,0 +1,188 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Knowable Labs <knowl@knowl.invalid>
+Date: Mon, 9 Nov 2026 17:37:41 -0800
+Subject: [PATCH 10/12] webapp, server: take the controls that break a Knowl
+ workspace from members
+
+A workspace is one team whose Topics and members the research service manages.
+A permissions migration takes renaming, archiving and re-describing a Topic,
+changing its members, group messages and making a team from members; the webapp
+hides what a role does not grant. The webapp also withholds editing and deleting
+one's own sent message (agents revise their own posts, so the permission stays),
+leaving and joining teams, group selection in the direct-message dialog, and
+every language but English, the one in which Topic is written.
+
+docs/guides/agent-workspace-design.md, Workspace controls.
+---
+ server/channels/app/permissions_migrations.go | 38 +++++++++++++++++++
+ server/public/model/migration.go              |  1 +
+ .../more_direct_channels/list/list.tsx        |  4 +-
+ .../sidebar_header/sidebar_team_menu.tsx      | 10 +++--
+ webapp/channels/src/i18n/i18n.ts              |  8 ++++
+ .../mattermost-redux/src/utils/post_utils.ts  |  5 +++
+ webapp/channels/src/utils/post_utils.ts       |  3 +-
+ 7 files changed, 64 insertions(+), 5 deletions(-)
+
+diff --git a/server/channels/app/permissions_migrations.go b/server/channels/app/permissions_migrations.go
+index 620129dc..af5b16e3 100644
+--- a/server/channels/app/permissions_migrations.go
++++ b/server/channels/app/permissions_migrations.go
+@@ -1329,6 +1329,43 @@ func (a *App) getAddEditFileAttachmentPermissionMigration() (permissionsMap, err
+ 	}, nil
+ }
+ 
++// Knowl: a workspace's team, Topics and their members are the research service's to
++// manage. A member cannot rename, archive or re-describe a Topic, change who is in it,
++// start a group message or make another team; the webapp hides what a role does not
++// grant. Administrators keep all of it. Editing and deleting one's own message stay
++// granted, because agents revise their own posts; the webapp withholds those from people.
++func (a *App) getKnowlWorkspaceControlsMigration() (permissionsMap, error) {
++	return permissionsMap{
++		permissionTransformation{
++			On: isRole(model.ChannelUserRoleId),
++			Remove: []string{
++				model.PermissionManagePublicChannelProperties.Id,
++				model.PermissionManagePrivateChannelProperties.Id,
++				model.PermissionDeletePublicChannel.Id,
++				model.PermissionDeletePrivateChannel.Id,
++				model.PermissionManagePublicChannelMembers.Id,
++				model.PermissionManagePrivateChannelMembers.Id,
++			},
++		},
++		// Whoever a Topic or the team was made for is its administrator, and those
++		// roles grant membership a second time.
++		permissionTransformation{
++			On: permissionOr(isRole(model.ChannelAdminRoleId), isRole(model.TeamAdminRoleId)),
++			Remove: []string{
++				model.PermissionManagePublicChannelMembers.Id,
++				model.PermissionManagePrivateChannelMembers.Id,
++			},
++		},
++		permissionTransformation{
++			On: isRole(model.SystemUserRoleId),
++			Remove: []string{
++				model.PermissionCreateTeam.Id,
++				model.PermissionCreateGroupChannel.Id,
++			},
++		},
++	}, nil
++}
++
+ func (a *App) getAddDiscoverableChannelPermissionsMigration() (permissionsMap, error) {
+ 	return permissionsMap{
+ 		permissionTransformation{
+@@ -1408,6 +1445,7 @@ func (s *Server) doPermissionsMigrations() error {
+ 		{Key: model.MigrationKeyAddManageAgentPermissions, Migration: a.getAddManageAgentPermissionsMigration},
+ 		{Key: model.MigrationKeyAddEditFileAttachmentPermission, Migration: a.getAddEditFileAttachmentPermissionMigration},
+ 		{Key: model.MigrationKeyAddDiscoverableChannelPermissions, Migration: a.getAddDiscoverableChannelPermissionsMigration},
++		{Key: model.MigrationKeyKnowlWorkspaceControls, Migration: a.getKnowlWorkspaceControlsMigration},
+ 	}
+ 
+ 	roles, err := s.Store().Role().GetAll()
+diff --git a/server/public/model/migration.go b/server/public/model/migration.go
+index 7ece8d25..becfeb65 100644
+--- a/server/public/model/migration.go
++++ b/server/public/model/migration.go
+@@ -66,4 +66,5 @@ const (
+ 	MigrationKeyAddManageAgentPermissions              = "add_manage_agent_permissions"
+ 	MigrationKeyAddEditFileAttachmentPermission        = "add_edit_file_attachment_permission"
+ 	MigrationKeyAddDiscoverableChannelPermissions      = "add_discoverable_channel_permissions"
++	MigrationKeyKnowlWorkspaceControls                 = "knowl_workspace_controls"
+ )
+diff --git a/webapp/channels/src/components/more_direct_channels/list/list.tsx b/webapp/channels/src/components/more_direct_channels/list/list.tsx
+index ba674975..eb67354c 100644
+--- a/webapp/channels/src/components/more_direct_channels/list/list.tsx
++++ b/webapp/channels/src/components/more_direct_channels/list/list.tsx
+@@ -18,7 +18,9 @@ import ListItem from '../list_item';
+ import {optionValue} from '../types';
+ import type {Option, OptionValue} from '../types';
+ 
+-const MAX_SELECTABLE_VALUES = Constants.MAX_USERS_IN_GM - 1;
++// Knowl: a conversation is with one agent; nothing answers a group message, and the Knowl
++// build takes create_group_channel from members.
++const MAX_SELECTABLE_VALUES = Math.min(1, Constants.MAX_USERS_IN_GM - 1);
+ export const USERS_PER_PAGE = 50;
+ 
+ type Props = {
+diff --git a/webapp/channels/src/components/sidebar/sidebar_header/sidebar_team_menu.tsx b/webapp/channels/src/components/sidebar/sidebar_header/sidebar_team_menu.tsx
+index 949c9dd1..b66569b8 100644
+--- a/webapp/channels/src/components/sidebar/sidebar_header/sidebar_team_menu.tsx
++++ b/webapp/channels/src/components/sidebar/sidebar_header/sidebar_team_menu.tsx
+@@ -46,6 +46,10 @@ import {isCloudLicense} from 'utils/license_utils';
+ 
+ import type {GlobalState} from 'types/store';
+ 
++// Knowl: a workspace is one team, so there is none to leave and none to join. Making a
++// team follows the create_team permission, which the Knowl build takes from members.
++const SEVERAL_TEAMS: boolean = false;
++
+ interface Props {
+     currentTeam: Team;
+ }
+@@ -103,11 +107,11 @@ export default function SidebarTeamMenu(props: Props) {
+                     teamID={props.currentTeam.id}
+                 />
+             )}
+-            {(!isTeamGroupConstrained && experimentalPrimaryTeam !== props.currentTeam.name) && (
++            {(!isTeamGroupConstrained && experimentalPrimaryTeam !== props.currentTeam.name && SEVERAL_TEAMS) && (
+                 <LeaveTeamMenuItem/>
+             )}
+-            {(canJoinAnotherTeam || havePermissionToCreateTeam) && <Menu.Separator/>}
+-            {canJoinAnotherTeam &&
++            {((canJoinAnotherTeam && SEVERAL_TEAMS) || havePermissionToCreateTeam) && <Menu.Separator/>}
++            {canJoinAnotherTeam && SEVERAL_TEAMS &&
+                 <JoinAnotherTeamMenuItem/>
+             }
+             {havePermissionToCreateTeam && (
+diff --git a/webapp/channels/src/i18n/i18n.ts b/webapp/channels/src/i18n/i18n.ts
+index 0a691722..c6897a01 100644
+--- a/webapp/channels/src/i18n/i18n.ts
++++ b/webapp/channels/src/i18n/i18n.ts
+@@ -173,8 +173,16 @@ export function getAllLanguages(includeExperimental = false): Record<string, Lan
+     return languages;
+ }
+ 
++const ENGLISH_ONLY: boolean = true;
++
+ export function getLanguages(state: GlobalState) {
+     const config = getConfig(state);
++
++    // Knowl: "Topic" is written into the English strings alone (transform.mjs), so English
++    // is the one language offered whatever the server lists.
++    if (ENGLISH_ONLY) {
++        return {en: languages.en};
++    }
+     if (!config.AvailableLocales) {
+         return getAllLanguages(config.EnableExperimentalLocales === 'true');
+     }
+diff --git a/webapp/channels/src/packages/mattermost-redux/src/utils/post_utils.ts b/webapp/channels/src/packages/mattermost-redux/src/utils/post_utils.ts
+index 4cea8d1f..299d22a8 100644
+--- a/webapp/channels/src/packages/mattermost-redux/src/utils/post_utils.ts
++++ b/webapp/channels/src/packages/mattermost-redux/src/utils/post_utils.ts
+@@ -74,6 +74,11 @@ export function canEditPost(state: GlobalState, config: any, license: any, teamI
+     }
+ 
+     const isOwner = isPostOwner(userId, post);
++
++    // Knowl: the team has already acted on a sent message, so it stays as it was sent.
++    if (isOwner) {
++        return false;
++    }
+     let canEdit = true;
+ 
+     const permission = isOwner ? Permissions.EDIT_POST : Permissions.EDIT_OTHERS_POSTS;
+diff --git a/webapp/channels/src/utils/post_utils.ts b/webapp/channels/src/utils/post_utils.ts
+index 56ef56ff..8a002c6e 100644
+--- a/webapp/channels/src/utils/post_utils.ts
++++ b/webapp/channels/src/utils/post_utils.ts
+@@ -121,8 +121,9 @@ export function canDeletePost(state: GlobalState, post: Post, channel?: Channel)
+         return false;
+     }
+ 
++    // Knowl: the team has already acted on a sent message, so it stays in the record.
+     if (isPostOwner(state, post)) {
+-        return haveIChannelPermission(state, channel && channel.team_id, post.channel_id, Permissions.DELETE_POST);
++        return false;
+     }
+     return haveIChannelPermission(state, channel && channel.team_id, post.channel_id, Permissions.DELETE_OTHERS_POSTS);
+ }

@@ -19,7 +19,9 @@ TAG="$(cat "$HERE/VERSION")"
 SRC="${KNOWL_MATTERMOST_SRC:-$HOME/.knowable/agent/mattermost-src}"
 DIST="${KNOWL_MATTERMOST_DIST:-$HOME/.knowable/agent/mattermost-dist}"
 IMAGE="${KNOWL_MATTERMOST_IMAGE:-knowl-mattermost:${TAG#v}-knowl}"
-ARCH="$(docker version --format '{{.Server.Arch}}')"
+# KNOWL_MATTERMOST_ARCH builds for another architecture than the Docker host's: the local
+# development stack runs linux/amd64 (orchestrator/dev/workspace_stack.py).
+ARCH="${KNOWL_MATTERMOST_ARCH:-$(docker version --format '{{.Server.Arch}}')}"
 
 if [ "${1:-}" = "--patches" ]; then
   rm -f "$HERE"/patches/*.patch
@@ -72,7 +74,7 @@ NOTE
 
 echo "== image $IMAGE"
 cp "$HERE/Dockerfile" "$DIST/Dockerfile"
-docker build -q -t "$IMAGE" "$DIST"
+docker build -q --platform "linux/$ARCH" -t "$IMAGE" "$DIST"
 
 # The candidate producer retains the exact transformed source before cleanup,
 # including the pinned module/lock files. No customer data or controller state is

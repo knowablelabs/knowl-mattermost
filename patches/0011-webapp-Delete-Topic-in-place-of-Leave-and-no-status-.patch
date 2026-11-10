@@ -1,0 +1,191 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Knowable Labs <knowl@knowl.invalid>
+Date: Mon, 9 Nov 2026 17:58:51 -0800
+Subject: [PATCH 11/12] webapp: Delete Topic in place of Leave, and no status
+ in the account menu
+
+Leaving a Topic already stops its team and takes it from the person's list, and
+nobody can add them back, so the action is named for what it does: Delete, with
+a confirmation that says so. The account menu keeps the name, the profile and
+signing out; a person's availability has no reader in a workspace of agents.
+
+docs/guides/agent-workspace-design.md, Workspace controls.
+---
+ .../sidebar_channel_menu.tsx                  |  3 +-
+ .../user_account_menu/user_account_menu.tsx   | 98 ++++++++++---------
+ webapp/channels/src/i18n/en.json              | 10 +-
+ 3 files changed, 60 insertions(+), 51 deletions(-)
+
+diff --git a/webapp/channels/src/components/sidebar/sidebar_channel/sidebar_channel_menu/sidebar_channel_menu.tsx b/webapp/channels/src/components/sidebar/sidebar_channel/sidebar_channel_menu/sidebar_channel_menu.tsx
+index a31dacca..a3850497 100644
+--- a/webapp/channels/src/components/sidebar/sidebar_channel/sidebar_channel_menu/sidebar_channel_menu.tsx
++++ b/webapp/channels/src/components/sidebar/sidebar_channel/sidebar_channel_menu/sidebar_channel_menu.tsx
+@@ -15,6 +15,7 @@ import {
+     AccountPlusOutlineIcon,
+     DotsVerticalIcon,
+     ExitToAppIcon,
++    TrashCanOutlineIcon,
+ } from '@mattermost/compass-icons/components';
+ import {WithTooltip} from '@mattermost/shared/components/tooltip';
+ 
+@@ -293,7 +294,7 @@ const SidebarChannelMenu = ({
+             <Menu.Item
+                 id={`leave-${channel.id}`}
+                 onClick={handleLeaveChannel}
+-                leadingElement={<ExitToAppIcon size={18}/>}
++                leadingElement={channel.type === Constants.DM_CHANNEL || channel.type === Constants.GM_CHANNEL ? <ExitToAppIcon size={18}/> : <TrashCanOutlineIcon size={18}/>}
+                 labels={leaveChannelText}
+                 isDestructive={true}
+             />
+diff --git a/webapp/channels/src/components/user_account_menu/user_account_menu.tsx b/webapp/channels/src/components/user_account_menu/user_account_menu.tsx
+index 8d169cd9..ab212aac 100644
+--- a/webapp/channels/src/components/user_account_menu/user_account_menu.tsx
++++ b/webapp/channels/src/components/user_account_menu/user_account_menu.tsx
+@@ -32,6 +32,10 @@ type Props = PropsFromRedux;
+ export const ELEMENT_ID_FOR_USER_ACCOUNT_MENU_BUTTON = 'userAccountMenuButton';
+ export const ELEMENT_ID_FOR_USER_ACCOUNT_MENU = 'userAccountMenu';
+ 
++// Knowl: an agent is working, waiting or finished, and says so itself; a person's
++// availability has no reader. The menu is the name, the profile and signing out.
++const STATUS: boolean = false;
++
+ export default function UserAccountMenu(props: Props) {
+     const {formatMessage} = useIntl();
+ 
+@@ -80,52 +84,56 @@ export default function UserAccountMenu(props: Props) {
+                 profilePicture={props.profilePicture}
+             />
+             <Menu.Separator/>
+-            {props.status === UserStatuses.OUT_OF_OFFICE && (
+-                <UserAccountOutOfOfficeMenuItem
+-                    userId={props.userId}
+-                    shouldConfirmBeforeStatusChange={shouldConfirmBeforeStatusChange}
+-                />
+-            )}
+-            {props.status === UserStatuses.OUT_OF_OFFICE && (
+-                <Menu.Separator/>
+-            )}
+-            {props.isCustomStatusEnabled && !isCustomStatusSet && (
+-                <UserAccountSetCustomStatusMenuItem
+-                    openCustomStatusModal={openCustomStatusModal}
+-                />
+-            )}
+-            {props.isCustomStatusEnabled && isCustomStatusSet && (
+-                <UserAccountCustomStatusMenuItem
+-                    timezone={props.timezone}
+-                    customStatus={props.customStatus}
+-                    openCustomStatusModal={openCustomStatusModal}
+-                />
+-            )}
+-            {props.isCustomStatusEnabled && (
+-                <Menu.Separator/>
++            {STATUS && (
++                <>
++                    {props.status === UserStatuses.OUT_OF_OFFICE && (
++                        <UserAccountOutOfOfficeMenuItem
++                            userId={props.userId}
++                            shouldConfirmBeforeStatusChange={shouldConfirmBeforeStatusChange}
++                        />
++                    )}
++                    {props.status === UserStatuses.OUT_OF_OFFICE && (
++                        <Menu.Separator/>
++                    )}
++                    {props.isCustomStatusEnabled && !isCustomStatusSet && (
++                        <UserAccountSetCustomStatusMenuItem
++                            openCustomStatusModal={openCustomStatusModal}
++                        />
++                    )}
++                    {props.isCustomStatusEnabled && isCustomStatusSet && (
++                        <UserAccountCustomStatusMenuItem
++                            timezone={props.timezone}
++                            customStatus={props.customStatus}
++                            openCustomStatusModal={openCustomStatusModal}
++                        />
++                    )}
++                    {props.isCustomStatusEnabled && (
++                        <Menu.Separator/>
++                    )}
++                    <UserAccountOnlineMenuItem
++                        userId={props.userId}
++                        shouldConfirmBeforeStatusChange={shouldConfirmBeforeStatusChange}
++                        isStatusOnline={props.status === UserStatuses.ONLINE}
++                    />
++                    <UserAccountAwayMenuItem
++                        userId={props.userId}
++                        shouldConfirmBeforeStatusChange={shouldConfirmBeforeStatusChange}
++                        isStatusAway={props.status === UserStatuses.AWAY}
++                    />
++                    <UserAccountDndMenuItem
++                        userId={props.userId}
++                        shouldConfirmBeforeStatusChange={shouldConfirmBeforeStatusChange}
++                        timezone={props.timezone}
++                        isStatusDnd={props.status === UserStatuses.DND}
++                    />
++                    <UserAccountOfflineMenuItem
++                        userId={props.userId}
++                        shouldConfirmBeforeStatusChange={shouldConfirmBeforeStatusChange}
++                        isStatusOffline={props.status === UserStatuses.OFFLINE}
++                    />
++                    <Menu.Separator/>
++                </>
+             )}
+-            <UserAccountOnlineMenuItem
+-                userId={props.userId}
+-                shouldConfirmBeforeStatusChange={shouldConfirmBeforeStatusChange}
+-                isStatusOnline={props.status === UserStatuses.ONLINE}
+-            />
+-            <UserAccountAwayMenuItem
+-                userId={props.userId}
+-                shouldConfirmBeforeStatusChange={shouldConfirmBeforeStatusChange}
+-                isStatusAway={props.status === UserStatuses.AWAY}
+-            />
+-            <UserAccountDndMenuItem
+-                userId={props.userId}
+-                shouldConfirmBeforeStatusChange={shouldConfirmBeforeStatusChange}
+-                timezone={props.timezone}
+-                isStatusDnd={props.status === UserStatuses.DND}
+-            />
+-            <UserAccountOfflineMenuItem
+-                userId={props.userId}
+-                shouldConfirmBeforeStatusChange={shouldConfirmBeforeStatusChange}
+-                isStatusOffline={props.status === UserStatuses.OFFLINE}
+-            />
+-            <Menu.Separator/>
+             <UserAccountProfileMenuItem
+                 userId={props.userId}
+             />
+diff --git a/webapp/channels/src/i18n/en.json b/webapp/channels/src/i18n/en.json
+index b752ce7b..353a093d 100644
+--- a/webapp/channels/src/i18n/en.json
++++ b/webapp/channels/src/i18n/en.json
+@@ -4440,7 +4440,7 @@
+   "channel_header.headerText.addNewButton": "Add a channel header",
+   "channel_header.lastActive": "Last online {timestamp}",
+   "channel_header.lastOnline": "Last online {timestamp}",
+-  "channel_header.leave": "Leave Channel",
++  "channel_header.leave": "Delete Channel",
+   "channel_header.members": "Members",
+   "channel_header.mute": "Mute Channel",
+   "channel_header.muteConversation": "Mute",
+@@ -5943,9 +5943,9 @@
+   "leave_policy_channel_modal.mute_hint": "To stay a member without notifications, you can mute this channel instead.",
+   "leave_policy_channel_modal.mute_instead": "Mute instead",
+   "leave_policy_channel_modal.title": "Leave {channel} channel",
+-  "leave_private_channel_modal.leave": "Yes, leave channel",
+-  "leave_private_channel_modal.message": "Are you sure you wish to leave the private channel {channel}? You must be re-invited in order to re-join this channel in the future.",
+-  "leave_private_channel_modal.title": "Leave Private Channel {channel}",
++  "leave_private_channel_modal.leave": "Yes, delete channel",
++  "leave_private_channel_modal.message": "Are you sure you wish to delete {channel}? Its team stops and it is removed from your list. Files the team wrote stay where they are. This cannot be undone.",
++  "leave_private_channel_modal.title": "Delete {channel}",
+   "leave_public_channel_modal.message": "Are you sure you wish to leave the channel {channel}? You can re-join this channel in the future if you change your mind.",
+   "leave_public_channel_modal.title": "Leave Channel {channel}",
+   "leave_team_modal_guest_only_private.description": "<strong>You will be removed from {num_of_private_channels} private {num_of_private_channels,plural,one {channel} other {channels}} on this team.</strong> You won't be able to rejoin it without an invitation from another team member. Are you sure?",
+@@ -7104,7 +7104,7 @@
+   "sidebar_left.sidebar_channel_menu.editChannel.ariaLabel": "Channel options for {channelName}",
+   "sidebar_left.sidebar_channel_menu.favoriteChannel": "Favorite",
+   "sidebar_left.sidebar_channel_menu.favorites": "Favorites",
+-  "sidebar_left.sidebar_channel_menu.leaveChannel": "Leave Channel",
++  "sidebar_left.sidebar_channel_menu.leaveChannel": "Delete Channel",
+   "sidebar_left.sidebar_channel_menu.leaveConversation": "Close Conversation",
+   "sidebar_left.sidebar_channel_menu.markAsRead": "Mark as Read",
+   "sidebar_left.sidebar_channel_menu.markAsUnread": "Mark as Unread",
