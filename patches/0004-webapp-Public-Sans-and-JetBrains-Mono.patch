@@ -4,7 +4,7 @@ Date: Wed, 21 Oct 2026 18:57:07 -0700
 Subject: [PATCH 4/8] webapp: Public Sans and JetBrains Mono
 
 The font files and the rename of 'Open Sans' and Metropolis are applied
-by knowablelabs' build (dashboard/agent/mattermost/build.sh).
+by knowablelabs' build (agent-harness/mattermost/build.sh).
 ---
  .../channels/src/sass/base/_typography.scss   | 35 +++++++++++++++++++
  1 file changed, 35 insertions(+)
@@ -19,7 +19,7 @@ index cde6d900..8716b64c 100644
  }
 +
 +/* Knowl: Public Sans for text and JetBrains Mono for code (SIL Open Font License 1.1). The
-+   files are copied in by knowablelabs' dashboard/agent/mattermost/build.sh, and its transform
++   files are copied in by knowablelabs' agent-harness/mattermost/build.sh, and its transform
 +   points every 'Open Sans' and Metropolis declaration at Public Sans. */
 +@font-face {
 +    font-display: swap;

@@ -3,8 +3,8 @@
 # patches, the mechanical transform, then a local image. docs/guides/agent-workspace-design.md,
 # The pieces.
 #
-#   dashboard/agent/mattermost/build.sh            build the image knowl-mattermost:<tag>-knowl
-#   dashboard/agent/mattermost/build.sh --patches  rewrite patches/ from the source's knowl branch
+#   agent-harness/mattermost/build.sh            build the image knowl-mattermost:<tag>-knowl
+#   agent-harness/mattermost/build.sh --patches  rewrite patches/ from the source's knowl branch
 #
 # To change a patch: edit on the source's `knowl` branch (one commit per patch), then
 # --patches. A build leaves the source back on that branch, clean.
@@ -69,7 +69,7 @@ cp LICENSE.txt NOTICE.txt "$DIST/"
 cat > "$DIST/SOURCE.md" <<NOTE
 Knowl's build of Mattermost ${TAG}, open-source edition (AGPLv3; admin tools and configuration
 Apache 2.0). Source: https://github.com/mattermost/mattermost at ${TAG}, with the patches and
-transform in knowablelabs' dashboard/agent/mattermost/ applied. server/enterprise is not built.
+transform in knowablelabs' agent-harness/mattermost/ applied. server/enterprise is not built.
 NOTE
 
 echo "== image $IMAGE"
