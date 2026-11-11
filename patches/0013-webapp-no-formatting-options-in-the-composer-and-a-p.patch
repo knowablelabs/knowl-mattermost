@@ -1,0 +1,390 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Knowable Labs <knowl@knowl.invalid>
+Date: Tue, 10 Nov 2026 16:37:56 -0800
+Subject: [PATCH 13/13] webapp: no formatting options in the composer, and a
+ place for Knowl's Stop
+
+A message to an agent is plain words, an attachment and an emoji. The formatting
+bar, its toggle and the preview are not rendered, and with the bar go the controls
+it carried: priority, burn on read, plugin and AI actions. The Help link under the
+composer, which opened the formatting help, goes too. Markdown typed by hand
+still renders. Beside Send is an empty element where Knowl's plugin draws Stop
+while agents are working.
+
+docs/guides/agent-workspace-design.md, The composer.
+---
+ .../advanced_text_editor.tsx                  | 154 +++---------------
+ .../advanced_text_editor/footer.test.tsx      |  38 +----
+ .../advanced_text_editor/footer.tsx           |   3 -
+ 3 files changed, 23 insertions(+), 172 deletions(-)
+
+diff --git a/webapp/channels/src/components/advanced_text_editor/advanced_text_editor.tsx b/webapp/channels/src/components/advanced_text_editor/advanced_text_editor.tsx
+index ccab9589..fe7f64f6 100644
+--- a/webapp/channels/src/components/advanced_text_editor/advanced_text_editor.tsx
++++ b/webapp/channels/src/components/advanced_text_editor/advanced_text_editor.tsx
+@@ -10,7 +10,6 @@ import {useDispatch, useSelector} from 'react-redux';
+ import type {ServerError} from '@mattermost/types/errors';
+ import type {SchedulingInfo} from '@mattermost/types/schedule_post';
+ 
+-import {savePreferences} from 'mattermost-redux/actions/preferences';
+ import {Permissions} from 'mattermost-redux/constants';
+ import {getChannel, makeGetChannel, getDirectChannel} from 'mattermost-redux/selectors/entities/channels';
+ import {getConfig, getFeatureFlagValue} from 'mattermost-redux/selectors/entities/general';
+@@ -32,9 +31,7 @@ import PostBoxIndicator from 'components/advanced_text_editor/post_box_indicator
+ import WysiwygEditor from 'components/advanced_text_editor/wysiwyg_editor/wysiwyg_editor';
+ import type {WysiwygEditorHandle} from 'components/advanced_text_editor/wysiwyg_editor/wysiwyg_editor';
+ import {makeAsyncComponent} from 'components/async_load';
+-import AutoHeightSwitcher from 'components/common/auto_height_switcher';
+ import useDidUpdate from 'components/common/hooks/useDidUpdate';
+-import useGetAgentsBridgeEnabled from 'components/common/hooks/useGetAgentsBridgeEnabled';
+ import DeletePostModal from 'components/delete_post_modal';
+ import {
+     DropOverlayIdCreateComment,
+@@ -53,7 +50,6 @@ import Constants, {
+     Locations,
+     StoragePrefixes,
+     Preferences,
+-    AdvancedTextEditor as AdvancedTextEditorConst,
+     UserStatuses,
+     ModalIdentifiers,
+     AdvancedTextEditorTextboxIds,
+@@ -69,24 +65,19 @@ import type {GlobalState} from 'types/store';
+ import type {PostDraft} from 'types/store/draft';
+ import {draftHasAttachments, isPostDraftEmpty} from 'types/store/draft';
+ 
+-import AIActionsMenu from './ai_actions_menu';
+ import DoNotDisturbWarning from './do_not_disturb_warning';
+ import EditPostFooter from './edit_post_footer';
+ import Footer from './footer';
+-import FormattingBar from './formatting_bar';
+-import {FormattingBarSpacer, Separator} from './formatting_bar/formatting_bar';
++import {FormattingBarSpacer} from './formatting_bar/formatting_bar';
+ import type {FormattingBarHandle} from './formatting_bar/formatting_bar';
+ import MessageWithMentionsFooter from './message_with_mentions_footer';
+ import SendButton from './send_button';
+-import ShowFormat from './show_formatting';
+ import TexteditorActions from './texteditor_actions';
+-import ToggleFormattingBar from './toggle_formatting_bar';
+ import UnifiedLabelsWrapper from './unified_labels_wrapper';
+ import useBurnOnRead from './use_burn_on_read';
+ import {useComposerPlaceholder} from './use_composer_placeholder';
+ import useEditorEmojiPicker from './use_editor_emoji_picker';
+ import useKeyHandler from './use_key_handler';
+-import usePluginItems from './use_plugin_items';
+ import usePriority from './use_priority';
+ import useRewrite from './use_rewrite';
+ import useSubmit from './use_submit';
+@@ -161,17 +152,6 @@ const AdvancedTextEditor = ({
+ 
+     const isRHS = isThreadView ? false : Boolean(rootId) || location === Locations.RHS_COMMENT;
+ 
+-    const getFormattingBarPreferenceName = () => {
+-        let name: string;
+-        if (isRHS) {
+-            name = isInEditMode ? AdvancedTextEditorConst.EDIT : AdvancedTextEditorConst.COMMENT;
+-        } else {
+-            name = AdvancedTextEditorConst.POST;
+-        }
+-
+-        return name;
+-    };
+-
+     const currentUserId = useSelector(getCurrentUserId);
+     const channel = useSelector((state: GlobalState) => getChannelSelector(state, channelId));
+     const channelDisplayName = channel?.display_name || '';
+@@ -182,16 +162,10 @@ const AdvancedTextEditor = ({
+     const maxPostSize = useSelector((state: GlobalState) => parseInt(getConfig(state).MaxPostSize || '', 10) || Constants.DEFAULT_CHARACTER_LIMIT);
+     const canUploadFiles = useSelector((state: GlobalState) => canUploadFilesAccordingToConfig(getConfig(state)));
+     const fullWidthTextBox = useSelector((state: GlobalState) => get(state, Preferences.CATEGORY_DISPLAY_SETTINGS, Preferences.CHANNEL_DISPLAY_MODE, Preferences.CHANNEL_DISPLAY_MODE_DEFAULT) === Preferences.CHANNEL_DISPLAY_MODE_FULL_SCREEN);
+-    const isFormattingBarHidden = useSelector((state: GlobalState) => {
+-        const preferenceName = getFormattingBarPreferenceName();
+-        return getBool(state, Preferences.ADVANCED_TEXT_EDITOR, preferenceName);
+-    });
+     const teammateId = useSelector((state: GlobalState) => getDirectChannel(state, channelId)?.teammate_id || '');
+     const teammateDisplayName = useSelector((state: GlobalState) => (teammateId ? getDisplayName(state, teammateId) : ''));
+     const showDndWarning = useSelector((state: GlobalState) => (teammateId ? getStatusForUserId(state, teammateId) === UserStatuses.DND : false));
+     const selectedPostFocussedAt = useSelector((state: GlobalState) => getSelectedPostFocussedAt(state));
+-    const aiActionMenuItems = useSelector((state: GlobalState) => state.plugins.components.AIActionMenuItem);
+-    const {available: aiRewriteEnabled} = useGetAgentsBridgeEnabled();
+ 
+     const canPost = useSelector((state: GlobalState) => {
+         const channel = getChannel(state, channelId);
+@@ -236,11 +210,15 @@ const AdvancedTextEditor = ({
+     const [showPreview, setShowPreview] = useState(false);
+     const [isMessageLong, setIsMessageLong] = useState(false);
+     const [renderScrollbar, setRenderScrollbar] = useState(false);
+-    const [keepEditorInFocus, setKeepEditorInFocus] = useState(false);
++    const [, setKeepEditorInFocus] = useState(false);
+ 
+     const readOnlyChannel = !canPost;
+     const hasDraftMessage = Boolean(draft.message);
+-    const showFormattingBar = !isFormattingBarHidden && !readOnlyChannel;
++
++    // Knowl: a message to an agent is plain words, an attachment and an emoji. The formatting
++    // bar, its toggle, the preview, and what the bar carried (priority, burn on read, plugin
++    // and AI actions) are not in the composer; Markdown typed by hand still renders.
++    const showFormattingBar = false;
+     const enableSharedChannelsDMs = useSelector((state: GlobalState) => getFeatureFlagValue(state, 'EnableSharedChannelsDMs') === 'true');
+     const wysiwygEnabled = useSelector(getWysiwygEditorPreference);
+     const ctrlSend = useSelector((state: GlobalState) => getBool(state, Preferences.CATEGORY_ADVANCED_SETTINGS, 'send_on_ctrl_enter'));
+@@ -251,9 +229,8 @@ const AdvancedTextEditor = ({
+         setDraft(draftFromStore);
+     }
+ 
+-    const handleShowPreview = useCallback(() => {
+-        setShowPreview((prev) => !prev);
+-    }, []);
++    // Knowl: the shortcuts that showed the formatting bar and the preview do nothing.
++    const noFormattingControl = useCallback(() => {}, []);
+ 
+     const emitTypingEvent = useCallback(() => {
+         GlobalActions.emitLocalUserTypingEvent(channelId, rootId);
+@@ -411,24 +388,10 @@ const AdvancedTextEditor = ({
+         });
+     }, [showPreview, wysiwygEnabled, handleDraftChange, applyWysiwygFormatting]);
+ 
+-    const toggleAdvanceTextEditor = useCallback(() => {
+-        dispatch(savePreferences(currentUserId, [{
+-            category: Preferences.ADVANCED_TEXT_EDITOR,
+-            user_id: currentUserId,
+-
+-            // name: isRHS ? AdvancedTextEditorConst.COMMENT : AdvancedTextEditorConst.POST,
+-            name: getFormattingBarPreferenceName(),
+-            value: String(!isFormattingBarHidden),
+-        }]));
+-    }, [dispatch, currentUserId, getFormattingBarPreferenceName, isFormattingBarHidden]);
+-
+-    const pluginItems = usePluginItems(draft, textboxRef, handleDraftChange);
+     const focusTextbox = useTextboxFocus(textboxRef, channelId, isRHS, canPost, wysiwygRef);
+     const {
+-        rewriteMenuProps,
+         isProcessing: rewriteIsProcessing,
+     } = useRewrite(draft, handleDraftChange, textboxRef, focusTextbox, setServerError);
+-    const hasAIActionsMenu = (aiActionMenuItems?.length ?? 0) > 0 || (aiRewriteEnabled && Boolean(rewriteMenuProps));
+     const isDisabled = Boolean(readOnlyChannel || (!enableSharedChannelsDMs && isDMOrGMRemote) || rewriteIsProcessing);
+ 
+     const [attachmentPreview, fileUploadJSX] = useUploadFiles(
+@@ -461,13 +424,11 @@ const AdvancedTextEditor = ({
+     );
+     const {
+         labels: priorityLabels,
+-        additionalControl: priorityAdditionalControl,
+         isValidPersistentNotifications,
+         onSubmitCheck: prioritySubmitCheck,
+     } = usePriority(draft, handleDraftChange, focusTextbox, showPreview, false);
+     const {
+         labels: burnOnReadLabels,
+-        additionalControl: burnOnReadAdditionalControl,
+     } = useBurnOnRead(draft, handleDraftChange, focusTextbox, showPreview, false);
+     const [handleSubmit, errorClass] = useSubmit(
+         draft,
+@@ -563,8 +524,8 @@ const AdvancedTextEditor = ({
+         handleDraftChange,
+         handleSubmitWrapper,
+         emitTypingEvent,
+-        handleShowPreview,
+-        toggleAdvanceTextEditor,
++        noFormattingControl,
++        noFormattingControl,
+         toggleEmojiPicker,
+         isInEditMode,
+         handleCancel,
+@@ -616,21 +577,6 @@ const AdvancedTextEditor = ({
+         });
+     }, [draft, handleDraftChange, serverError, emitTypingEvent]);
+ 
+-    const getSelectedText = useCallback(() => {
+-        const input = textboxRef.current?.getInputBox();
+-        return {
+-            start: input?.selectionStart ?? 0,
+-            end: input?.selectionEnd ?? 0,
+-        };
+-    }, [textboxRef]);
+-
+-    const updateText = useCallback((message: string) => {
+-        handleDraftChange({
+-            ...draftRef.current,
+-            message,
+-        });
+-    }, [handleDraftChange]);
+-
+     const handleWidthChange = useCallback((width: number) => {
+         const input = textboxRef.current?.getInputBox();
+         if (!editorBodyRef.current || !editorActionsRef.current || !input) {
+@@ -736,13 +682,6 @@ const AdvancedTextEditor = ({
+         />
+     );
+ 
+-    const showFormatJSX = (disableSendButton || wysiwygEnabled) ? null : (
+-        <ShowFormat
+-            onClick={handleShowPreview}
+-            active={showPreview}
+-        />
+-    );
+-
+     let createMessage;
+     if (placeholder) {
+         createMessage = placeholder;
+@@ -803,49 +742,6 @@ const AdvancedTextEditor = ({
+ 
+     const ariaLabel = loginSuccessfulLabel ? `${loginSuccessfulLabel} ${ariaLabelMessageInput}` : ariaLabelMessageInput;
+ 
+-    const additionalControls = useMemo(() => [
+-        !isInEditMode && priorityAdditionalControl,
+-        !isInEditMode && burnOnReadAdditionalControl,
+-        ...(pluginItems || []),
+-    ].filter(Boolean), [pluginItems, priorityAdditionalControl, isInEditMode, burnOnReadAdditionalControl]);
+-
+-    const aiActionsMenu = useMemo(() => {
+-        if (!hasAIActionsMenu) {
+-            return null;
+-        }
+-
+-        return (
+-            <AIActionsMenu
+-                draft={draft}
+-                getSelectedText={getSelectedText}
+-                updateText={updateText}
+-                channelId={channelId}
+-                isRHS={location === Locations.RHS_COMMENT}
+-                rewriteMenuProps={rewriteMenuProps}
+-                aiRewriteEnabled={aiRewriteEnabled}
+-            />
+-        );
+-    }, [draft, getSelectedText, updateText, channelId, location, rewriteMenuProps, aiRewriteEnabled, hasAIActionsMenu]);
+-
+-    const formattingBar = (
+-        <AutoHeightSwitcher
+-            showSlot={showFormattingBar ? 1 : 2}
+-            slot1={(
+-                <FormattingBar
+-                    ref={formattingBarRef}
+-                    applyFormatting={applyFormatting}
+-                    disableControls={showPreview}
+-                    additionalControls={additionalControls}
+-                    location={location}
+-                    aiActionsMenu={aiActionsMenu}
+-                    getEditor={wysiwygEnabled ? () => wysiwygRef.current?.getEditor() ?? null : undefined}
+-                />
+-            )}
+-            slot2={null}
+-            shouldScrollIntoView={keepEditorInFocus}
+-        />
+-    );
+-
+     const fileUploadOverlay = useMemo(() => {
+         const overlayType = isRHS ? 'right' : 'center';
+         const direction = 'horizontal';
+@@ -977,32 +873,22 @@ const AdvancedTextEditor = ({
+                             />
+                         )}
+                         {attachmentPreview}
+-                        {!isDisabled && (showFormattingBar || showPreview) && (
+-                            <TexteditorActions
+-                                placement='top'
+-                                isScrollbarRendered={renderScrollbar}
+-                            >
+-                                {showFormatJSX}
+-                            </TexteditorActions>
+-                        )}
+-                        {showFormattingSpacer ? (
+-                            <FormattingBarSpacer>
+-                                {formattingBar}
+-                            </FormattingBarSpacer>
+-                        ) : formattingBar}
++                        {showFormattingSpacer && <FormattingBarSpacer/>}
+                         {!isDisabled && (
+                             <TexteditorActions
+                                 ref={editorActionsRef}
+                                 placement='bottom'
+                             >
+-                                <ToggleFormattingBar
+-                                    onClick={toggleAdvanceTextEditor}
+-                                    active={showFormattingBar}
+-                                    disabled={showPreview}
+-                                />
+-                                <Separator/>
+                                 {fileUploadJSX}
+                                 {emojiPicker}
++                                {/* Knowl: where its plugin draws Stop while agents are working (ComposerStop.tsx). */}
++                                {!isInEditMode && (
++                                    <span
++                                        className='KnowlComposerStop'
++                                        data-channel-id={channelId}
++                                        data-root-id={rootId}
++                                    />
++                                )}
+                                 {sendButton}
+                             </TexteditorActions>
+                         )}
+diff --git a/webapp/channels/src/components/advanced_text_editor/footer.test.tsx b/webapp/channels/src/components/advanced_text_editor/footer.test.tsx
+index 7f37f9c4..8b8f3884 100644
+--- a/webapp/channels/src/components/advanced_text_editor/footer.test.tsx
++++ b/webapp/channels/src/components/advanced_text_editor/footer.test.tsx
+@@ -18,42 +18,10 @@ describe('Footer Component', () => {
+         isInEditMode: false,
+     };
+ 
+-    describe('HelpButton visibility', () => {
+-        it('should render HelpButton when not in edit mode', () => {
+-            renderWithContext(
+-                <Footer
+-                    {...baseProps}
+-                    isInEditMode={false}
+-                />,
+-            );
++    it('should render no Help link', () => {
++        renderWithContext(<Footer {...baseProps}/>);
+ 
+-            expect(screen.getByText('Help')).toBeInTheDocument();
+-        });
+-
+-        it('should not render HelpButton when in edit mode', () => {
+-            renderWithContext(
+-                <Footer
+-                    {...baseProps}
+-                    isInEditMode={true}
+-                />,
+-            );
+-
+-            expect(screen.queryByText('Help')).not.toBeInTheDocument();
+-        });
+-
+-        it('should render HelpButton as a button element with correct attributes', () => {
+-            renderWithContext(
+-                <Footer
+-                    {...baseProps}
+-                    isInEditMode={false}
+-                />,
+-            );
+-
+-            const helpButton = screen.getByText('Help');
+-            expect(helpButton.tagName).toBe('BUTTON');
+-            expect(helpButton).toHaveAttribute('type', 'button');
+-            expect(helpButton).toHaveAttribute('aria-label', 'Messaging help');
+-        });
++        expect(screen.queryByText('Help')).not.toBeInTheDocument();
+     });
+ 
+     describe('Footer structure', () => {
+diff --git a/webapp/channels/src/components/advanced_text_editor/footer.tsx b/webapp/channels/src/components/advanced_text_editor/footer.tsx
+index 4d3f6441..0998c05e 100644
+--- a/webapp/channels/src/components/advanced_text_editor/footer.tsx
++++ b/webapp/channels/src/components/advanced_text_editor/footer.tsx
+@@ -12,8 +12,6 @@ import type {Post} from '@mattermost/types/posts';
+ import MessageSubmitError from 'components/message_submit_error';
+ import MsgTyping from 'components/msg_typing';
+ 
+-import HelpButton from './help_button';
+-
+ interface Props {
+     postError?: ReactNode;
+     errorClass: string | null;
+@@ -57,7 +55,6 @@ export default function Footer({
+                     rootId={rootId}
+                 />
+             )}
+-            {!isInEditMode && <HelpButton/>}
+         </div>
+     );
+ }
